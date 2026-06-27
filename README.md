@@ -8,15 +8,15 @@
 ```text
 MazeAI/
 │
-├── include/
-│   ├── model.h
-│   ├── game_engine.h
-│   ├── ai_player.h
-│   ├── game_recorder.h
+├── include/    
+│   ├── model.h          //数据结构  
+│   ├── game_engine.h    //裁判层头文件
+│   ├── ai_player.h      //玩家层头文件
+│   ├── game_recorder.h  //数据统计层头文件
 │   ├── json_loader.h
 │   └── algorithm.h
 │
-├── src/
+├── src/                 //各层对应实现
 │   ├── game_engine.cpp
 │   ├── ai_player.cpp
 │   ├── game_recorder.cpp
