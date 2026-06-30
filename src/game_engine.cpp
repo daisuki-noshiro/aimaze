@@ -32,7 +32,8 @@ GameEngine::GameEngine(const MapData& mapData,
     : map(mapData),
       config(gameConfig),
       player(playerState),
-      boss(bossState)
+      boss(bossState),
+      initialBossHpList(bossState.hpList)
 {
 }
 
@@ -198,10 +199,10 @@ vector<Event> GameEngine::handleSkill(const Action& action)
         defeated.bossIndex = boss.currentBoss;
         events.push_back(defeated);
         ++boss.currentBoss;
-        boss.currentRound = 0;
         if (boss.currentBoss >= static_cast<int>(boss.hpList.size()))
         {
             inBattle = false;
+            boss.currentRound = 0;
         }
     }
     else if (config.minRounds > 0 && boss.currentRound >= config.minRounds)
@@ -211,7 +212,14 @@ vector<Event> GameEngine::handleSkill(const Action& action)
         revive.coinDelta = -config.coinConsumption;
         revive.bossIndex = boss.currentBoss;
         events.push_back(revive);
+
+        boss.hpList = initialBossHpList;
+        boss.currentBoss = 0;
         boss.currentRound = 0;
+        for (Skill& playerSkill : player.skills)
+        {
+            playerSkill.currentCD = 0;
+        }
 
         if (player.coins < 0)
         {
@@ -258,9 +266,17 @@ vector<Event> GameEngine::updateCellEffect(const Position& pos)
     }
     else if (cell == END_CELL)
     {
-        status = GameStatus::WIN;
         events.push_back(makeEvent(EventType::REACH_END, pos));
-        events.push_back(makeEvent(EventType::GAME_WIN, pos));
+        if (boss.currentBoss >= static_cast<int>(boss.hpList.size()))
+        {
+            status = GameStatus::WIN;
+            events.push_back(makeEvent(EventType::GAME_WIN, pos));
+        }
+        else
+        {
+            status = GameStatus::LOSE;
+            events.push_back(makeEvent(EventType::GAME_LOSE, pos));
+        }
     }
 
     return events;

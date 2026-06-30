@@ -182,4 +182,10 @@ struct GameResult
     vector<Position> path;
     vector<Action> actions;
     vector<Event> events;
+    bool bossSuccess = false;
+    int bossTotalTurns = 0;
+    int bossReviveCount = 0;
+    int bossCoinCost = 0;
+    vector<int> bossSkillSequenceLengths;
+    vector<vector<int>> bossSkillSequences;
 };

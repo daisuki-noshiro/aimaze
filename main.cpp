@@ -53,7 +53,7 @@ int main(int argc, char* argv[])
         }
 
         GameResult result = recorder.getResult();
-        Visualizer::saveResult(result, "output/result.txt");
+        Visualizer::saveResult(result, "output/result.json");
         Visualizer::saveProcess(recorder.getRecords(), "output/process.txt");
     }
     catch (const exception& ex)

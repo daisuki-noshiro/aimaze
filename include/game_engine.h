@@ -10,6 +10,7 @@ private:
     GameConfig config;
     PlayerState player;
     BossState boss;
+    vector<int> initialBossHpList;
     GameStatus status = GameStatus::RUNNING;
     bool inBattle = false;
 

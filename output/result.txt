@@ -1,4 +1,0 @@
-status: WIN
-coins: 240
-steps: 108
-ratio: 2.22222
