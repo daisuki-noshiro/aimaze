@@ -1,7 +1,9 @@
 #include "visualizer.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <set>
 
 namespace
 {
@@ -123,6 +125,65 @@ void writeSkillSequencesJson(ofstream& out, const vector<vector<int>>& sequences
     }
     out << "]";
 }
+
+string cellClass(char cell)
+{
+    if (cell == '#')
+    {
+        return "wall";
+    }
+    if (cell == 'S')
+    {
+        return "start";
+    }
+    if (cell == 'E')
+    {
+        return "end";
+    }
+    if (cell == 'G')
+    {
+        return "gold";
+    }
+    if (cell == 'T')
+    {
+        return "trap";
+    }
+    if (cell == 'B')
+    {
+        return "boss";
+    }
+    return "road";
+}
+
+string cellText(char cell)
+{
+    return cell == ' ' ? "" : string(1, cell);
+}
+
+void writeJsString(ofstream& out, const string& value)
+{
+    out << "\"";
+    for (char ch : value)
+    {
+        if (ch == '\\')
+        {
+            out << "\\\\";
+        }
+        else if (ch == '"')
+        {
+            out << "\\\"";
+        }
+        else if (ch == '\n')
+        {
+            out << "\\n";
+        }
+        else
+        {
+            out << ch;
+        }
+    }
+    out << "\"";
+}
 }
 
 // saveResult（保存最终结果）输入形式 const GameResult& result, const string& path 输入含义 游戏统计结果、输出文件路径 输出形式 void 输出含义 无返回值，写入接口对齐的JSON结果文件
@@ -179,4 +240,218 @@ void Visualizer::saveProcess(const vector<StepRecord>& records, const string& pa
         }
         out << "\n\n";
     }
+}
+
+void Visualizer::saveHtml(const MapData& mapData,
+                          const vector<StepRecord>& records,
+                          const GameResult& result,
+                          const string& path)
+{
+    ensureParentDirectory(path);
+    ofstream out(path);
+
+    int columnCount = 0;
+    for (const vector<char>& row : mapData.maze)
+    {
+        columnCount = max(columnCount, static_cast<int>(row.size()));
+    }
+
+    PlayerState initialPlayer;
+    if (!records.empty())
+    {
+        initialPlayer = records.front().before.player;
+    }
+    else
+    {
+        initialPlayer.position = mapData.start;
+    }
+
+    out << "<!doctype html>\n";
+    out << "<html lang=\"en\">\n";
+    out << "<head>\n";
+    out << "  <meta charset=\"utf-8\">\n";
+    out << "  <title>Maze Visualization</title>\n";
+    out << "  <style>\n";
+    out << "    body { margin: 0; font-family: Arial, sans-serif; background: #f6f7fb; color: #1f2937; }\n";
+    out << "    .page { max-width: 1180px; margin: 28px auto; padding: 0 24px; }\n";
+    out << "    h1 { margin: 0 0 18px; font-size: 28px; }\n";
+    out << "    .layout { display: flex; align-items: flex-start; gap: 24px; }\n";
+    out << "    .maze { display: grid; gap: 3px; width: max-content; padding: 16px; background: #ffffff; border: 1px solid #d7dce5; }\n";
+    out << "    .cell { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; box-sizing: border-box; }\n";
+    out << "    .wall { background: #111827; color: #111827; }\n";
+    out << "    .road { background: #ffffff; border: 1px solid #e5e7eb; }\n";
+    out << "    .start { background: #2563eb; color: #ffffff; }\n";
+    out << "    .end { background: #16a34a; color: #ffffff; }\n";
+    out << "    .gold { background: #facc15; color: #713f12; }\n";
+    out << "    .trap { background: #ef4444; color: #ffffff; }\n";
+    out << "    .boss { background: #7c3aed; color: #ffffff; }\n";
+    out << "    .path { box-shadow: inset 0 0 0 4px #38bdf8; }\n";
+    out << "    .road.path { background: #bae6fd; }\n";
+    out << "    .current { outline: 4px solid #f97316; outline-offset: -4px; }\n";
+    out << "    .panel { width: 300px; padding: 16px; background: #ffffff; border: 1px solid #d7dce5; }\n";
+    out << "    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }\n";
+    out << "    .stat { padding: 10px; background: #f8fafc; border: 1px solid #e5e7eb; }\n";
+    out << "    .label { display: block; margin-bottom: 4px; color: #64748b; font-size: 12px; }\n";
+    out << "    .value { font-size: 18px; font-weight: 700; }\n";
+    out << "    .controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 12px 0; }\n";
+    out << "    button { height: 34px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-weight: 700; cursor: pointer; }\n";
+    out << "    button:hover { background: #f1f5f9; }\n";
+    out << "    input[type=range] { width: 100%; }\n";
+    out << "    .line { margin: 10px 0; font-size: 14px; }\n";
+    out << "    .events { min-height: 44px; padding: 10px; background: #f8fafc; border: 1px solid #e5e7eb; font-size: 13px; line-height: 1.5; }\n";
+    out << "    .legend { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 18px; }\n";
+    out << "    .legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }\n";
+    out << "    .legend-swatch { width: 18px; height: 18px; border: 1px solid #d1d5db; box-sizing: border-box; }\n";
+    out << "  </style>\n";
+    out << "</head>\n";
+    out << "<body>\n";
+    out << "  <main class=\"page\">\n";
+    out << "    <h1>Maze Visualization</h1>\n";
+    out << "    <div class=\"layout\">\n";
+    out << "      <section>\n";
+    out << "        <div id=\"maze\" class=\"maze\"></div>\n";
+    out << "        <div class=\"legend\">\n";
+    out << "          <span class=\"legend-item\"><span class=\"legend-swatch start\"></span>Start</span>\n";
+    out << "          <span class=\"legend-item\"><span class=\"legend-swatch end\"></span>End</span>\n";
+    out << "          <span class=\"legend-item\"><span class=\"legend-swatch wall\"></span>Wall</span>\n";
+    out << "          <span class=\"legend-item\"><span class=\"legend-swatch road\"></span>Road</span>\n";
+    out << "          <span class=\"legend-item\"><span class=\"legend-swatch gold\"></span>Gold</span>\n";
+    out << "          <span class=\"legend-item\"><span class=\"legend-swatch trap\"></span>Trap</span>\n";
+    out << "          <span class=\"legend-item\"><span class=\"legend-swatch boss\"></span>Boss</span>\n";
+    out << "          <span class=\"legend-item\"><span class=\"legend-swatch road path\"></span>Path</span>\n";
+    out << "        </div>\n";
+    out << "      </section>\n";
+    out << "      <aside class=\"panel\">\n";
+    out << "        <div class=\"stats\">\n";
+    out << "          <div class=\"stat\"><span class=\"label\">Step</span><span id=\"stepValue\" class=\"value\">0</span></div>\n";
+    out << "          <div class=\"stat\"><span class=\"label\">Coins</span><span id=\"coinValue\" class=\"value\">0</span></div>\n";
+    out << "          <div class=\"stat\"><span class=\"label\">Position</span><span id=\"positionValue\" class=\"value\">(0,0)</span></div>\n";
+    out << "          <div class=\"stat\"><span class=\"label\">Status</span><span class=\"value\">" << statusToString(result.status) << "</span></div>\n";
+    out << "        </div>\n";
+    out << "        <input id=\"stepRange\" type=\"range\" min=\"0\" value=\"0\">\n";
+    out << "        <div class=\"controls\">\n";
+    out << "          <button id=\"prevBtn\">Prev</button>\n";
+    out << "          <button id=\"playBtn\">Play</button>\n";
+    out << "          <button id=\"nextBtn\">Next</button>\n";
+    out << "        </div>\n";
+    out << "        <div class=\"line\"><strong>Action:</strong> <span id=\"actionValue\">START</span></div>\n";
+    out << "        <div class=\"line\"><strong>Events:</strong></div>\n";
+    out << "        <div id=\"eventsValue\" class=\"events\">START</div>\n";
+    out << "        <div class=\"line\"><strong>Final:</strong> coins " << result.coins
+        << ", steps " << result.steps << ", ratio " << result.ratio << "</div>\n";
+    out << "      </aside>\n";
+    out << "    </div>\n";
+    out << "  </main>\n";
+    out << "  <script>\n";
+    out << "    const columnCount = " << columnCount << ";\n";
+    out << "    const maze = [\n";
+    for (size_t rowIndex = 0; rowIndex < mapData.maze.size(); ++rowIndex)
+    {
+        if (rowIndex > 0)
+        {
+            out << ",\n";
+        }
+        out << "      [";
+        for (int column = 0; column < columnCount; ++column)
+        {
+            if (column > 0)
+            {
+                out << ",";
+            }
+            char cell = column < static_cast<int>(mapData.maze[rowIndex].size())
+                ? mapData.maze[rowIndex][column]
+                : '#';
+            writeJsString(out, string(1, cell));
+        }
+        out << "]";
+    }
+    out << "\n    ];\n";
+    out << "    const steps = [\n";
+    out << "      {step:0, position:[" << initialPlayer.position.x << "," << initialPlayer.position.y
+        << "], coins:" << initialPlayer.coins << ", action:\"START\", events:[\"START\"]}";
+    for (size_t i = 0; i < records.size(); ++i)
+    {
+        const StepRecord& record = records[i];
+        out << ",\n      {step:" << i + 1
+            << ", position:[" << record.after.player.position.x << "," << record.after.player.position.y << "]"
+            << ", coins:" << record.after.player.coins
+            << ", action:";
+        writeJsString(out, actionToString(record.action));
+        out << ", events:[";
+        for (size_t eventIndex = 0; eventIndex < record.events.size(); ++eventIndex)
+        {
+            if (eventIndex > 0)
+            {
+                out << ",";
+            }
+            writeJsString(out, eventToString(record.events[eventIndex].type));
+        }
+        out << "]}";
+    }
+    out << "\n    ];\n";
+    out << "    let currentIndex = 0;\n";
+    out << "    let timer = null;\n";
+    out << "    const mazeEl = document.getElementById('maze');\n";
+    out << "    const rangeEl = document.getElementById('stepRange');\n";
+    out << "    const playBtn = document.getElementById('playBtn');\n";
+    out << "    function classForCell(cell) {\n";
+    out << "      if (cell === '#') return 'wall';\n";
+    out << "      if (cell === 'S') return 'start';\n";
+    out << "      if (cell === 'E') return 'end';\n";
+    out << "      if (cell === 'G') return 'gold';\n";
+    out << "      if (cell === 'T') return 'trap';\n";
+    out << "      if (cell === 'B') return 'boss';\n";
+    out << "      return 'road';\n";
+    out << "    }\n";
+    out << "    function textForCell(cell) { return cell === ' ' ? '' : cell; }\n";
+    out << "    function key(position) { return position[0] + ',' + position[1]; }\n";
+    out << "    function stopPlayback() {\n";
+    out << "      if (timer !== null) { clearInterval(timer); timer = null; }\n";
+    out << "      playBtn.textContent = 'Play';\n";
+    out << "    }\n";
+    out << "    function render() {\n";
+    out << "      const step = steps[currentIndex];\n";
+    out << "      const visited = new Set();\n";
+    out << "      for (let i = 0; i <= currentIndex; ++i) visited.add(key(steps[i].position));\n";
+    out << "      mazeEl.innerHTML = '';\n";
+    out << "      mazeEl.style.gridTemplateColumns = `repeat(${columnCount}, 32px)`;\n";
+    out << "      for (let row = 0; row < maze.length; ++row) {\n";
+    out << "        for (let column = 0; column < columnCount; ++column) {\n";
+    out << "          const cell = maze[row][column] || '#';\n";
+    out << "          const pos = [row, column];\n";
+    out << "          const div = document.createElement('div');\n";
+    out << "          div.className = 'cell ' + classForCell(cell)\n";
+    out << "            + (visited.has(key(pos)) ? ' path' : '')\n";
+    out << "            + (key(pos) === key(step.position) ? ' current' : '');\n";
+    out << "          div.textContent = textForCell(cell);\n";
+    out << "          mazeEl.appendChild(div);\n";
+    out << "        }\n";
+    out << "      }\n";
+    out << "      document.getElementById('stepValue').textContent = step.step;\n";
+    out << "      document.getElementById('coinValue').textContent = step.coins;\n";
+    out << "      document.getElementById('positionValue').textContent = '(' + step.position[0] + ',' + step.position[1] + ')';\n";
+    out << "      document.getElementById('actionValue').textContent = step.action;\n";
+    out << "      document.getElementById('eventsValue').textContent = step.events.length ? step.events.join(', ') : 'NONE';\n";
+    out << "      rangeEl.value = currentIndex;\n";
+    out << "    }\n";
+    out << "    function goTo(index) {\n";
+    out << "      currentIndex = Math.max(0, Math.min(index, steps.length - 1));\n";
+    out << "      render();\n";
+    out << "    }\n";
+    out << "    document.getElementById('prevBtn').addEventListener('click', () => { stopPlayback(); goTo(currentIndex - 1); });\n";
+    out << "    document.getElementById('nextBtn').addEventListener('click', () => { stopPlayback(); goTo(currentIndex + 1); });\n";
+    out << "    playBtn.addEventListener('click', () => {\n";
+    out << "      if (timer !== null) { stopPlayback(); return; }\n";
+    out << "      playBtn.textContent = 'Pause';\n";
+    out << "      timer = setInterval(() => {\n";
+    out << "        if (currentIndex >= steps.length - 1) { stopPlayback(); return; }\n";
+    out << "        goTo(currentIndex + 1);\n";
+    out << "      }, 220);\n";
+    out << "    });\n";
+    out << "    rangeEl.max = steps.length - 1;\n";
+    out << "    rangeEl.addEventListener('input', () => { stopPlayback(); goTo(Number(rangeEl.value)); });\n";
+    out << "    render();\n";
+    out << "  </script>\n";
+    out << "</body>\n";
+    out << "</html>\n";
 }
