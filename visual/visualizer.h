@@ -13,4 +13,10 @@ public:
 
     // saveProcess（保存运行过程）输入形式 const vector<StepRecord>& records, const string& path 输入含义 每步记录列表、输出文件路径 输出形式 void 输出含义 无返回值，写入过程文本文件
     static void saveProcess(const vector<StepRecord>& records, const string& path);
+
+    static void saveHtml(const MapData& mapData,
+                         const vector<StepRecord>& records,
+                         const GameResult& result,
+                         const string& path);
+    
 };

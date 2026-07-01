@@ -1,0 +1,42 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "Build MazeAI",
+            "command": "C:\\mingw64\\bin\\g++.exe",
+            "args": [
+                "-fdiagnostics-color=always",
+                "-g",
+                "-std=c++17",
+                "-Iinclude",
+                "-Ivisual",
+                "main.cpp",
+                "src/game_engine.cpp",
+                "src/ai_player.cpp",
+                "src/game_recorder.cpp",
+                "src/json_loader.cpp",
+                "algorithms/greedy.cpp",
+                "algorithms/astar.cpp",
+                "algorithms/dijkstra.cpp",
+                "algorithms/bfs.cpp",
+                "algorithms/divide.cpp",
+                "algorithms/battle.cpp",
+                "visual/visualizer.cpp",
+                "-o",
+                "build/MazeAI.exe"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Build the whole MazeAI project."
+        }
+    ]
+}

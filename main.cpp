@@ -55,6 +55,7 @@ int main(int argc, char* argv[])
         GameResult result = recorder.getResult();
         Visualizer::saveResult(result, "output/result.json");
         Visualizer::saveProcess(recorder.getRecords(), "output/process.txt");
+        Visualizer::saveHtml(data.mapData, recorder.getRecords(), result, "output/visualization.html");
     }
     catch (const exception& ex)
     {
