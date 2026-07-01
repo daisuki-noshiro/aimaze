@@ -31,21 +31,37 @@ vector<int> cooldownAfterUse(const vector<int>& currentCooldowns,
     return nextCooldowns;
 }
 
-// searchBestSequence（搜索最短胜利技能序列）输入形式 int hp, int roundsLeft, const vector<Skill>& skills, const vector<int>& cooldowns, vector<int>& current, vector<int>& best 输入含义 Boss剩余血量、剩余回合、技能列表、当前冷却、当前序列、最佳序列 输出形式 bool 输出含义 true表示找到可击败Boss的序列
-bool searchBestSequence(int hp,
+// searchBestSequence（搜索已知Boss最短胜利技能序列）输入形式 const vector<int>& knownBossHp, int bossOffset, int hp, int roundsLeft, const vector<Skill>& skills, const vector<int>& cooldowns, vector<int>& current, vector<int>& best 输入含义 已知Boss血量序列、当前序列下标、当前Boss血量、剩余回合、技能列表、当前冷却、当前序列、最佳序列 输出形式 bool 输出含义 true表示找到可击败已知Boss序列的技能序列
+bool searchBestSequence(const vector<int>& knownBossHp,
+                        int bossOffset,
+                        int hp,
                         int roundsLeft,
                         const vector<Skill>& skills,
                         const vector<int>& cooldowns,
                         vector<int>& current,
                         vector<int>& best)
 {
-    if (hp <= 0)
+    if (bossOffset >= static_cast<int>(knownBossHp.size()))
     {
         if (best.empty() || current.size() < best.size())
         {
             best = current;
         }
         return true;
+    }
+
+    if (hp <= 0)
+    {
+        int nextOffset = bossOffset + 1;
+        int nextHp = nextOffset < static_cast<int>(knownBossHp.size()) ? knownBossHp[nextOffset] : 0;
+        return searchBestSequence(knownBossHp,
+                                  nextOffset,
+                                  nextHp,
+                                  roundsLeft,
+                                  skills,
+                                  cooldowns,
+                                  current,
+                                  best);
     }
     if (roundsLeft <= 0)
     {
@@ -75,7 +91,9 @@ bool searchBestSequence(int hp,
 
         current.push_back(index);
         vector<int> nextCooldowns = cooldownAfterUse(cooldowns, skills, index);
-        if (searchBestSequence(hp - skills[index].damage,
+        if (searchBestSequence(knownBossHp,
+                               bossOffset,
+                               hp - skills[index].damage,
                                roundsLeft - 1,
                                skills,
                                nextCooldowns,
@@ -105,18 +123,35 @@ int chooseHighestDamageReadySkill(const vector<Skill>& skills)
     }
     return bestIndex;
 }
+
+// buildKnownBossHp（构造已知Boss序列）输入形式 const GameState& state, const BossMemory& bossMemory 输入含义 当前可见Boss状态、AI已知Boss记忆 输出形式 vector<int> 输出含义 从当前Boss开始的连续已知血量序列
+vector<int> buildKnownBossHp(const GameState& state, const BossMemory& bossMemory)
+{
+    vector<int> knownBossHp;
+    knownBossHp.push_back(state.boss.currentBossHp);
+
+    for (int bossIndex = state.boss.currentBoss + 1;; ++bossIndex)
+    {
+        auto iter = bossMemory.knownHp.find(bossIndex);
+        if (iter == bossMemory.knownHp.end())
+        {
+            break;
+        }
+        knownBossHp.push_back(iter->second);
+    }
+
+    return knownBossHp;
+}
 }
 
-// Battle（Boss战算法）输入形式 const GameState& state 输入含义 当前Boss战状态 输出形式 Action 输出含义 搜索到的技能序列第一步动作，无法释放技能则为NONE
-Action Algorithm::Battle(const GameState& state)
+// Battle（Boss战算法）输入形式 const GameState& state, const BossMemory& bossMemory 输入含义 当前Boss战可见状态、AI已知Boss记忆 输出形式 Action 输出含义 搜索到的技能序列第一步动作，无法释放技能则为NONE
+Action Algorithm::Battle(const GameState& state, const BossMemory& bossMemory)
 {
-    if (state.boss.currentBoss < 0 ||
-        state.boss.currentBoss >= static_cast<int>(state.boss.hpList.size()))
+    if (state.boss.currentBoss < 0 || state.boss.currentBossHp <= 0)
     {
         return Action{};
     }
 
-    int hp = state.boss.hpList[state.boss.currentBoss];
     int roundsLeft = state.minRounds - state.boss.currentRound;
     if (roundsLeft <= 0)
     {
@@ -131,7 +166,15 @@ Action Algorithm::Battle(const GameState& state)
 
     vector<int> current;
     vector<int> best;
-    searchBestSequence(hp, roundsLeft, state.player.skills, cooldowns, current, best);
+    vector<int> knownBossHp = buildKnownBossHp(state, bossMemory);
+    searchBestSequence(knownBossHp,
+                       0,
+                       knownBossHp.front(),
+                       roundsLeft,
+                       state.player.skills,
+                       cooldowns,
+                       current,
+                       best);
     if (!best.empty())
     {
         return makeSkillAction(best.front());

@@ -7,6 +7,7 @@ class AIPlayer
 {
 private:
     map<Position, CellMemory> memory;
+    BossMemory bossMemory;
     ExploreMode exploreMode = ExploreMode::DIVIDE;
 
 public:
@@ -22,6 +23,9 @@ public:
 private:
     // updateMemory（更新玩家记忆）输入形式 const GameState& state 输入含义 当前3x3视野和玩家位置 输出形式 void 输出含义 无返回值，直接更新memory
     void updateMemory(const GameState& state);
+
+    // updateBossMemory（更新Boss记忆）输入形式 const GameState& state 输入含义 当前Boss战可见状态 输出形式 void 输出含义 无返回值，记录当前已见Boss血量
+    void updateBossMemory(const GameState& state);
 
     // needBattle（判断是否进入战斗策略）输入形式 const GameState& state 输入含义 当前游戏状态 输出形式 bool 输出含义 true表示当前处于Boss战
     bool needBattle(const GameState& state) const;

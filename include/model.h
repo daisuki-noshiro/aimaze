@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -83,6 +84,21 @@ struct Position
     }
 };
 
+namespace std
+{
+    // hash<Position>（坐标哈希函数）输入形式 const Position& position 输入含义 待转换的坐标 输出形式 size_t 输出含义 可供unordered_map使用的哈希值
+    template <>
+    struct hash<Position>
+    {
+        size_t operator()(const Position& position) const
+        {
+            size_t xHash = hash<int>()(position.x);
+            size_t yHash = hash<int>()(position.y);
+            return xHash ^ (yHash << 1);
+        }
+    };
+}
+
 // 技能：保存技能伤害、基础冷却和当前剩余冷却。
 struct Skill
 {
@@ -143,12 +159,28 @@ struct BossState
     int currentRound = 0;
 };
 
+// 可见 Boss 状态：GameEngine 只把当前正在战斗的 Boss 信息暴露给 AIPlayer。
+struct VisibleBossState
+{
+    int currentBoss = 0;
+    int currentBossHp = 0;
+    int currentRound = 0;
+};
+
+// Boss 记忆：AIPlayer 只记录已经见过的 Boss 血量，不保存未见过 Boss 的真实信息。
+struct BossMemory
+{
+    map<int, int> knownHp;
+    int minRounds = 0;
+    int coinConsumption = 0;
+};
+
 // 当前游戏状态：GameEngine 返回给 AIPlayer 的只读信息，vision 仅为 3x3。
 struct GameState
 {
     GameStatus status = GameStatus::RUNNING;
     PlayerState player;
-    BossState boss;
+    VisibleBossState boss;
     vector<vector<char>> vision;
     bool inBattle = false;
     int minRounds = 0;

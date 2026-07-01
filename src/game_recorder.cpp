@@ -25,8 +25,7 @@ GameResult GameRecorder::getResult() const
     result.ratio = result.status == GameStatus::WIN && result.steps != 0
         ? static_cast<double>(result.coins) / result.steps
         : 0.0;
-    result.bossSuccess = last.after.boss.hpList.empty() ||
-        last.after.boss.currentBoss >= static_cast<int>(last.after.boss.hpList.size());
+    result.bossSuccess = result.status == GameStatus::WIN;
 
     result.path.push_back(first.before.player.position);
 
@@ -58,8 +57,7 @@ GameResult GameRecorder::getResult() const
                 ++result.bossReviveCount;
                 result.bossCoinCost += std::abs(event.coinDelta);
             }
-            else if (event.type == EventType::BOSS_DEFEATED &&
-                     record.after.boss.currentBoss >= static_cast<int>(record.after.boss.hpList.size()))
+            else if (event.type == EventType::BOSS_DEFEATED && !record.after.inBattle)
             {
                 bossFinished = true;
             }

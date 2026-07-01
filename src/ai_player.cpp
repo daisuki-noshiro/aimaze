@@ -17,6 +17,7 @@ Action AIPlayer::decide(const GameState& state)
     updateMemory(state);
     if (needBattle(state))
     {
+        updateBossMemory(state);
         return battleStrategy(state);
     }
     return exploreStrategy(state);
@@ -37,6 +38,17 @@ void AIPlayer::updateMemory(const GameState& state)
         }
     }
     memory[center].visitCount++;
+}
+
+// updateBossMemory（更新Boss记忆）输入形式 const GameState& state 输入含义 当前Boss战可见状态 输出形式 void 输出含义 无返回值，记录当前已见Boss血量
+void AIPlayer::updateBossMemory(const GameState& state)
+{
+    if (bossMemory.knownHp.find(state.boss.currentBoss) == bossMemory.knownHp.end())
+    {
+        bossMemory.knownHp[state.boss.currentBoss] = state.boss.currentBossHp;
+    }
+    bossMemory.minRounds = state.minRounds;
+    bossMemory.coinConsumption = state.coinConsumption;
 }
 
 // needBattle（判断是否进入战斗策略）输入形式 const GameState& state 输入含义 当前游戏状态 输出形式 bool 输出含义 true表示当前处于Boss战
@@ -70,5 +82,5 @@ Action AIPlayer::exploreStrategy(const GameState& state)
 // battleStrategy（选择战斗算法）输入形式 const GameState& state 输入含义 当前Boss战状态 输出形式 Action 输出含义 战斗阶段产生的技能动作
 Action AIPlayer::battleStrategy(const GameState& state)
 {
-    return Algorithm::Battle(state);
+    return Algorithm::Battle(state, bossMemory);
 }

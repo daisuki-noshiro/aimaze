@@ -43,7 +43,13 @@ GameState GameEngine::getState() const
     GameState state;
     state.status = status;
     state.player = player;
-    state.boss = boss;
+    state.boss.currentBoss = boss.currentBoss;
+    state.boss.currentRound = boss.currentRound;
+    if (boss.currentBoss >= 0 &&
+        boss.currentBoss < static_cast<int>(boss.hpList.size()))
+    {
+        state.boss.currentBossHp = boss.hpList[boss.currentBoss];
+    }
     state.vision = getVision();
     state.inBattle = inBattle;
     state.minRounds = config.minRounds;
@@ -64,7 +70,16 @@ StepRecord GameEngine::step(const Action& action)
         return record;
     }
 
-    if (action.type == ActionType::MOVE)
+    if (inBattle && action.type != ActionType::USE_SKILL)
+    {
+        Event failed = makeEvent(EventType::USE_SKILL_FAILED, player.position);
+        failed.skillIndex = action.skillIndex;
+        record.events.push_back(failed);
+        ++boss.currentRound;
+        updateSkillCooldown();
+        handleBattleRoundLimit(record.events);
+    }
+    else if (action.type == ActionType::MOVE)
     {
         record.events = handleMove(action);
     }
@@ -203,30 +218,13 @@ vector<Event> GameEngine::handleSkill(const Action& action)
         {
             inBattle = false;
             boss.currentRound = 0;
+            if (map.maze[player.position.x][player.position.y] == BOSS_CELL)
+            {
+                map.maze[player.position.x][player.position.y] = ROAD_CELL;
+            }
         }
     }
-    else if (config.minRounds > 0 && boss.currentRound >= config.minRounds)
-    {
-        player.coins -= config.coinConsumption;
-        Event revive = makeEvent(EventType::REVIVE, player.position);
-        revive.coinDelta = -config.coinConsumption;
-        revive.bossIndex = boss.currentBoss;
-        events.push_back(revive);
-
-        boss.hpList = initialBossHpList;
-        boss.currentBoss = 0;
-        boss.currentRound = 0;
-        for (Skill& playerSkill : player.skills)
-        {
-            playerSkill.currentCD = 0;
-        }
-
-        if (player.coins < 0)
-        {
-            status = GameStatus::LOSE;
-            events.push_back(makeEvent(EventType::GAME_LOSE, player.position));
-        }
-    }
+    handleBattleRoundLimit(events);
 
     updateSkillCooldown();
     return events;
@@ -262,6 +260,9 @@ vector<Event> GameEngine::updateCellEffect(const Position& pos)
     else if (cell == BOSS_CELL)
     {
         inBattle = true;
+        boss.hpList = initialBossHpList;
+        boss.currentBoss = 0;
+        boss.currentRound = 0;
         events.push_back(makeEvent(EventType::ENTER_BOSS, pos));
     }
     else if (cell == END_CELL)
@@ -291,6 +292,40 @@ void GameEngine::updateSkillCooldown()
         {
             --skill.currentCD;
         }
+    }
+}
+
+// handleBattleRoundLimit（处理Boss战回合限制）输入形式 vector<Event>& events 输入含义 本回合事件列表 输出形式 void 输出含义 无返回值，可能追加复活或失败事件
+void GameEngine::handleBattleRoundLimit(vector<Event>& events)
+{
+    if (!inBattle ||
+        boss.currentBoss >= static_cast<int>(boss.hpList.size()) ||
+        config.minRounds <= 0 ||
+        boss.currentRound < config.minRounds)
+    {
+        return;
+    }
+
+    if (player.coins >= config.coinConsumption)
+    {
+        player.coins -= config.coinConsumption;
+        Event revive = makeEvent(EventType::REVIVE, player.position);
+        revive.coinDelta = -config.coinConsumption;
+        revive.bossIndex = boss.currentBoss;
+        events.push_back(revive);
+
+        boss.hpList = initialBossHpList;
+        boss.currentBoss = 0;
+        boss.currentRound = 0;
+        for (Skill& playerSkill : player.skills)
+        {
+            playerSkill.currentCD = 0;
+        }
+    }
+    else
+    {
+        status = GameStatus::LOSE;
+        events.push_back(makeEvent(EventType::GAME_LOSE, player.position));
     }
 }
 

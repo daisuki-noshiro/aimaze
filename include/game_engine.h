@@ -55,6 +55,9 @@ private:
     // updateSkillCooldown（更新技能冷却）输入形式 无 输入含义 使用player.skills当前冷却状态 输出形式 void 输出含义 无返回值，直接修改技能冷却
     void updateSkillCooldown();
 
+    // handleBattleRoundLimit（处理Boss战回合限制）输入形式 vector<Event>& events 输入含义 本回合事件列表 输出形式 void 输出含义 无返回值，可能追加复活或失败事件
+    void handleBattleRoundLimit(vector<Event>& events);
+
     // isAtBoss（判断玩家是否在Boss格）输入形式 无 输入含义 使用当前玩家位置 输出形式 bool 输出含义 true表示玩家位于Boss坐标
     bool isAtBoss() const;
 
