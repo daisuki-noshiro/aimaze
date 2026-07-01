@@ -64,7 +64,7 @@ namespace
     // - 墙：不可走 → 极大惩罚
     // - 陷阱：高惩罚
     // - 金币/出口/Boss：鼓励
-    // ======================================================
+   
     int cellCost(const CellMemory* cell)
     {
         if (!cell) return 3;              // 完全未知：中等风险
@@ -144,23 +144,21 @@ Action Algorithm::BFS(
 {
     Position start = state.player.position;
 
-   
-    // Step 1：生成候选目标（Target List）
     vector<Position> targets;
 
-    // 从记忆中找已经发现的目标
+   
+    // Step 1：找目标
+    
     for (auto& it : memory)
     {
         if (!it.second.discovered) continue;
 
         char t = it.second.type;
-
-        // 优先考虑：金币 / 终点 / Boss
         if (t == 'G' || t == 'E' || t == 'B')
             targets.push_back(it.first);
     }
 
-    // 如果没有明确目标 → 转向探索模式
+    // 没目标 → 探索frontier
     if (targets.empty())
     {
         for (auto& it : memory)
@@ -168,44 +166,35 @@ Action Algorithm::BFS(
             if (!it.second.discovered || it.second.type == '#')
                 continue;
 
-            bool isFrontier = false;
-
-            // 判断是否靠近未知区域
             for (auto& nxt : neighbors(it.first))
             {
                 auto jt = memory.find(nxt);
-
                 if (jt == memory.end() || !jt->second.discovered)
                 {
-                    isFrontier = true;
+                    targets.push_back(it.first);
                     break;
                 }
             }
-
-            if (isFrontier)
-                targets.push_back(it.first);
         }
     }
 
-    // 如果仍然没有目标 → fallback安全走一步
     if (targets.empty())
         return safeMove(state, memory);
 
- 
-    // Step 2：Branch & Bound 搜索最优目标
-
+   
+    // Step 2：搜索
+    
     double bestScore = -1e18;
+    int bestKnownCost = INT_MAX;
+
     Position bestTarget = targets.front();
     map<Position, Position> bestParent;
 
-    // 对每一个候选目标做 BFS
     for (const auto& target : targets)
     {
         queue<Position> q;
-
-        map<Position, int> dist;          // 当前路径代价
-        map<Position, Position> parent;   // 路径回溯
-        set<Position> visited;
+        map<Position, int> dist;
+        map<Position, Position> parent;
 
         q.push(start);
         dist[start] = 0;
@@ -215,78 +204,83 @@ Action Algorithm::BFS(
             Position cur = q.front();
             q.pop();
 
-            if (visited.count(cur)) continue;
-            visited.insert(cur);
-
             int g = dist[cur];
 
-         
-            // Branch & Bound 剪枝条件
-            // f = g + heuristic
+          
+            // 剪枝
             
             int bound = g + heuristic(cur, target);
 
-            // 如果已经明显太差 → 剪枝
-            if (bound > 60) continue;
+            int limit;
+            if (bestKnownCost == INT_MAX)
+                limit = 200;              // 初始宽松
+            else
+                limit = bestKnownCost + 10; // 自适应收紧
 
-          
-            // 找到目标节点
+            if (bound > limit)
+                continue;
+
+            
+            // 到达目标
+         
             if (cur == target)
             {
-                char type = memory.count(target)? memory[target].type: ' ';
+                char type = memory.count(target)
+                    ? memory[target].type
+                    : ' ';
 
                 double reward = 0;
 
-                
-                // reward设计（核心评分函数）
-              
-                if (type == 'G') reward = 50;        // 金币
-                else if (type == 'E') reward = 200;  // 终点
-                else if (type == 'B') reward = 150;  // Boss
+                if (type == 'G') reward = 50;
+                else if (type == 'E') reward = 200;
+                else if (type == 'B') reward = 150;
                 else reward = 20 * frontierGain(target, memory);
 
-                // 越短路径越好
-                double score = reward -2.0 *g;
+                double score = reward - 2.0 * g;
 
-                // 更新最优解
                 if (score > bestScore)
                 {
                     bestScore = score;
                     bestTarget = target;
                     bestParent = parent;
+                    bestKnownCost = min(bestKnownCost, g);
                 }
 
                 continue;
             }
 
-            // 扩展邻居节点
+          
+            // 扩展邻居
            
             for (auto& nxt : neighbors(cur))
             {
                 auto it = memory.find(nxt);
 
-                // 在线地图核心：允许未知，但要付代价
                 int cost = 1;
 
                 if (it == memory.end())
-                    cost = 3;                 // 未知
+                    cost = 3;
                 else if (!it->second.discovered)
-                    cost = 3;                 // 不确定区域
+                    cost = 3;
                 else
-                    cost = cellCost(&it->second); // 已知区域
+                    cost = cellCost(&it->second);
 
-                if (dist.count(nxt))
+                int newCost = g + cost;
+
+                // 更优路径更新
+                if (dist.count(nxt) && dist[nxt] <= newCost)
                     continue;
 
-                dist[nxt] = g + cost;
+                dist[nxt] = newCost;
                 parent[nxt] = cur;
                 q.push(nxt);
             }
         }
     }
 
+    
     // Step 3：回溯路径
-   
+    
     vector<Position> path;
     Position cur = bestTarget;
 
@@ -300,10 +294,8 @@ Action Algorithm::BFS(
         cur = bestParent[cur];
     }
 
-    // 如果没有路径 → fallback
     if (path.empty())
         return safeMove(state, memory);
 
-    // 返回下一步动作
     return makeMove(start, path.back());
 }
