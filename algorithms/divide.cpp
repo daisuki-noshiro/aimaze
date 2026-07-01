@@ -1,31 +1,16 @@
 #include "algorithm.h"
 
-#include <algorithm>
 #include <cstdlib>
-#include <queue>
-#include <set>
+#include <limits>
+
+using namespace std;
 
 namespace
 {
-// DirectionInfo（候选方向结构）输入形式 无 输入含义 无 输出形式 DirectionInfo 输出含义 保存方向、视野坐标和坐标增量
-struct DirectionInfo
-{
-    Direction direction;
-    int viewX;
-    int viewY;
-    int dx;
-    int dy;
-};
+static Direction lastDirection = Direction::UP;  //记录上次移动的方向
+static bool hasLastDirection = false;
 
-// 四个移动方向：顺序会影响同分时的选择。
-const vector<DirectionInfo> kDirections = {
-    {Direction::RIGHT, 1, 2, 0, 1},
-    {Direction::DOWN, 2, 1, 1, 0},
-    {Direction::LEFT, 1, 0, 0, -1},
-    {Direction::UP, 0, 1, -1, 0}
-};
-
-// makeMove（构造移动动作）输入形式 Direction direction 输入含义 移动方向 输出形式 Action 输出含义 MOVE类型动作
+// makeMove（构造移动动作）
 Action makeMove(Direction direction)
 {
     Action action;
@@ -34,170 +19,192 @@ Action makeMove(Direction direction)
     return action;
 }
 
-// isWalkable（判断格子是否可通行）输入形式 char cell 输入含义 地图格子字符 输出形式 bool 输出含义 true表示不是墙
-bool isWalkable(char cell)
+// nextPosition（计算相邻坐标）
+Position nextPosition(Position pos, int dx, int dy)
 {
-    return cell != '#';
+    return {pos.x + dx, pos.y + dy};
 }
 
-// nextPosition（计算相邻坐标）输入形式 Position position, const DirectionInfo& direction 输入含义 当前坐标、方向信息 输出形式 Position 输出含义 相邻目标坐标
-Position nextPosition(Position position, const DirectionInfo& direction)
+// isOpposite（判断是否反向移动）
+bool isOpposite(Direction a, Direction b)
 {
-    return {position.x + direction.dx, position.y + direction.dy};
+    return (a == Direction::UP && b == Direction::DOWN) ||
+           (a == Direction::DOWN && b == Direction::UP) ||
+           (a == Direction::LEFT && b == Direction::RIGHT) ||
+           (a == Direction::RIGHT && b == Direction::LEFT);
 }
 
-// isFrontier（判断是否为探索前沿）输入形式 const Position& position, const map<Position, CellMemory>& memory 输入含义 待判断坐标、AI已知地图记忆 输出形式 bool 输出含义 true表示该格可走且邻接未知区域
-bool isFrontier(const Position& position, const map<Position, CellMemory>& memory)
+// frontierValue（统计探索前沿数量）
+int frontierValue(Position pos, const map<Position, CellMemory>& memory)
 {
-    auto current = memory.find(position);
-    if (current == memory.end() || !isWalkable(current->second.type))
+    int value = 0;
+
+    if (memory.find({pos.x - 1, pos.y}) == memory.end()) ++value;
+    if (memory.find({pos.x + 1, pos.y}) == memory.end()) ++value;
+    if (memory.find({pos.x, pos.y - 1}) == memory.end()) ++value;
+    if (memory.find({pos.x, pos.y + 1}) == memory.end()) ++value;
+
+    return value;
+}
+
+// bossScore（计算Boss格分数）动态变化boss权重，防止太早或者太晚去打
+int bossScore(const GameState& state)
+{
+    int cost = state.coinConsumption;
+
+    if (cost <= 0)
     {
-        return false;
+        cost = 1;
     }
 
-    for (const DirectionInfo& direction : kDirections)
+    if (state.player.coins < cost)
     {
-        Position neighbor = nextPosition(position, direction);
-        if (memory.find(neighbor) == memory.end())
-        {
-            return true;
-        }
+        return -300;
     }
-    return false;
+
+    if (state.player.coins < cost * 2)
+    {
+        return -100;
+    }
+
+    if (state.player.coins < cost * 3)
+    {
+        return 100;
+    }
+
+    return 500;
 }
 
-// firstStepToTarget（在已知地图中寻找第一步）输入形式 Position start, Position target, const map<Position, CellMemory>& memory 输入含义 起点、目标、AI已知地图记忆 输出形式 Action 输出含义 通往目标的第一步MOVE动作，找不到则为NONE
-Action firstStepToTarget(Position start, Position target, const map<Position, CellMemory>& memory)
+// calcScore（计算相邻格评分）输入形式 char cell, Position pos, const GameState& state, const map<Position, CellMemory>& memory 输入含义 格子字符、格子坐标、当前状态、AI记忆地图 输出形式 int 输出含义 该方向相邻格子的综合评分
+int calcScore(char cell,
+              Position pos,
+              const GameState& state,
+              const map<Position, CellMemory>& memory)
 {
-    if (start == target)
+    if (cell == '#')
     {
-        return Action{};
+        return -9999;
     }
 
-    queue<Position> q;
-    set<Position> visited;
-    map<Position, Direction> firstDirection;
+    int score = 0;
 
-    q.push(start);
-    visited.insert(start);
-
-    while (!q.empty())
+    if (cell == 'E')
     {
-        Position current = q.front();
-        q.pop();
-
-        for (const DirectionInfo& direction : kDirections)
-        {
-            Position next = nextPosition(current, direction);
-            if (visited.count(next) > 0)
-            {
-                continue;
-            }
-
-            auto cell = memory.find(next);
-            if (cell == memory.end() || !isWalkable(cell->second.type))
-            {
-                continue;
-            }
-
-            visited.insert(next);
-            firstDirection[next] = (current == start) ? direction.direction : firstDirection[current];
-            if (next == target)
-            {
-                return makeMove(firstDirection[next]);
-            }
-            q.push(next);
-        }
+        score += 10000;
+    }
+    else if (cell == 'G')
+    {
+        score += 500;
+    }
+    else if (cell == 'T')
+    {
+        score -= 300;
+    }
+    else if (cell == 'B')
+    {
+        score += bossScore(state);
+    }
+    else
+    {
+        score += 30;
     }
 
-    return Action{};
-}
+    // 该格周围未知越多，越像探索前沿
+    score += frontierValue(pos, memory) * 20;
 
-// chooseLeastVisitedNeighbor（选择最少访问邻格）输入形式 const GameState& state, const map<Position, CellMemory>& memory 输入含义 当前状态、AI已知地图记忆 输出形式 Action 输出含义 访问次数最少的相邻可走格对应动作
-Action chooseLeastVisitedNeighbor(const GameState& state, const map<Position, CellMemory>& memory)
-{
-    bool found = false;
-    int bestVisit = 0;
-    Direction bestDirection = Direction::UP;
+    // 已经访问过多次的格子，降低优先级
+    auto iter = memory.find(pos);
 
-    for (const DirectionInfo& direction : kDirections)
+    if (iter != memory.end())
     {
-        char cell = state.vision[direction.viewX][direction.viewY];
-        if (!isWalkable(cell))
-        {
-            continue;
-        }
-
-        Position next = nextPosition(state.player.position, direction);
-        int visitCount = 0;
-        auto iter = memory.find(next);
-        if (iter != memory.end())
-        {
-            visitCount = iter->second.visitCount;
-        }
-
-        if (!found || visitCount < bestVisit)
-        {
-            found = true;
-            bestVisit = visitCount;
-            bestDirection = direction.direction;
-        }
+        score -= iter->second.visitCount * 80;
+    }
+    else
+    {
+        score += 100;
     }
 
-    return found ? makeMove(bestDirection) : Action{};
+    return score;
 }
 }
 
-// Divide（分治探索算法）输入形式 const GameState& state, map<Position, CellMemory>& memory 输入含义 当前状态、AI已知地图记忆 输出形式 Action 输出含义 分治策略给出的下一步动作
+// Divide（分治探索算法）输入形式 const GameState& state, map<Position, CellMemory>& memory 输入含义 当前状态、AI已知地图记忆 输出形式 Action 输出含义 对上下左右四个相邻格评分后得到的下一步动作
 Action Algorithm::Divide(const GameState& state, map<Position, CellMemory>& memory)
 {
-    // 第一层：直接处理 3x3 视野中的高价值目标。
-    for (const DirectionInfo& direction : kDirections)
+    Position player = state.player.position; //获取当前玩家位置
+
+    int upScore = calcScore(
+        state.vision[0][1],
+        nextPosition(player, -1, 0),
+        state,
+        memory
+    );
+
+    int downScore = calcScore(
+        state.vision[2][1],
+        nextPosition(player, 1, 0),
+        state,
+        memory
+    );
+
+    int leftScore = calcScore(
+        state.vision[1][0],
+        nextPosition(player, 0, -1),
+        state,
+        memory
+    );
+
+    int rightScore = calcScore(
+        state.vision[1][2],
+        nextPosition(player, 0, 1),
+        state,
+        memory
+    );
+
+    if (hasLastDirection && isOpposite(lastDirection, Direction::UP))  //重复走格子惩罚
     {
-        char cell = state.vision[direction.viewX][direction.viewY];
-        if (cell == 'G' || cell == 'E' || cell == 'B')
-        {
-            return makeMove(direction.direction);
-        }
+        upScore -= 250;
     }
 
-    // 第二层：在 AI 已知地图中选择访问次数较少、靠近未知区域的前沿格。
-    bool hasTarget = false;
-    Position bestTarget;
-    int bestVisit = 0;
-    int bestDistance = 0;
-
-    for (const auto& item : memory)
+    if (hasLastDirection && isOpposite(lastDirection, Direction::DOWN))
     {
-        const Position& position = item.first;
-        const CellMemory& cell = item.second;
-        if (!isFrontier(position, memory))
-        {
-            continue;
-        }
-
-        int distance = abs(position.x - state.player.position.x) +
-                       abs(position.y - state.player.position.y);
-        if (!hasTarget ||
-            cell.visitCount < bestVisit ||
-            (cell.visitCount == bestVisit && distance < bestDistance))
-        {
-            hasTarget = true;
-            bestTarget = position;
-            bestVisit = cell.visitCount;
-            bestDistance = distance;
-        }
+        downScore -= 250;
     }
 
-    if (hasTarget)
+    if (hasLastDirection && isOpposite(lastDirection, Direction::LEFT))
     {
-        Action action = firstStepToTarget(state.player.position, bestTarget, memory);
-        if (action.type != ActionType::NONE)
-        {
-            return action;
-        }
+        leftScore -= 250;
     }
 
-    // 第三层：如果找不到前沿路径，就在当前 3x3 内选择访问次数最少的相邻格。
-    return chooseLeastVisitedNeighbor(state, memory);
+    if (hasLastDirection && isOpposite(lastDirection, Direction::RIGHT))
+    {
+        rightScore -= 250;
+    }
+
+    int bestScore = upScore;    //大小比较
+    Direction bestDirection = Direction::UP;
+
+    if (downScore > bestScore)
+    {
+        bestScore = downScore;
+        bestDirection = Direction::DOWN;
+    }
+
+    if (leftScore > bestScore)
+    {
+        bestScore = leftScore;
+        bestDirection = Direction::LEFT;
+    }
+
+    if (rightScore > bestScore)
+    {
+        bestScore = rightScore;
+        bestDirection = Direction::RIGHT;
+    }
+
+    lastDirection = bestDirection;
+    hasLastDirection = true;
+
+    return makeMove(bestDirection);
 }
+
