@@ -51,7 +51,12 @@ GameState GameEngine::getState() const
         state.boss.currentBossHp = boss.hpList[boss.currentBoss];
     }
     state.vision = getVision();
+    if (config.finishOnNoAction)
+    {
+        state.knownMap = map.maze;
+    }
     state.inBattle = inBattle;
+    state.finishOnNoAction = config.finishOnNoAction;
     state.minRounds = config.minRounds;
     state.coinConsumption = config.coinConsumption;
     return state;
@@ -86,6 +91,11 @@ StepRecord GameEngine::step(const Action& action)
     else if (action.type == ActionType::USE_SKILL)
     {
         record.events = handleSkill(action);
+    }
+    else if (action.type == ActionType::NONE && config.finishOnNoAction)
+    {
+        status = GameStatus::WIN;
+        record.events.push_back(makeEvent(EventType::GAME_WIN, player.position));
     }
 
     record.after = getState();

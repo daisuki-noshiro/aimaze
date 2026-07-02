@@ -12,6 +12,10 @@ using namespace std;
 // parseMode（解析探索模式）输入形式 const string& text 输入含义 命令行传入的模式字符串 输出形式 ExploreMode 输出含义 对应的探索算法枚举
 ExploreMode parseMode(const string& text)
 {
+    if (text == "greedy")
+    {
+        return ExploreMode::GREEDY;
+    }
     if (text == "astar")
     {
         return ExploreMode::ASTAR;

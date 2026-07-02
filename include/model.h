@@ -140,6 +140,7 @@ struct GameConfig
 {
     int minRounds = 0;
     int coinConsumption = 0;
+    bool finishOnNoAction = false;
 };
 
 // 玩家状态：保存玩家位置、金币、步数和技能列表。
@@ -182,7 +183,9 @@ struct GameState
     PlayerState player;
     VisibleBossState boss;
     vector<vector<char>> vision;
+    vector<vector<char>> knownMap;
     bool inBattle = false;
+    bool finishOnNoAction = false;
     int minRounds = 0;
     int coinConsumption = 0;
 };

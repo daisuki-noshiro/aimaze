@@ -104,6 +104,11 @@ int extractInt(const string& text, const string& key)
     return negative ? -value : value;
 }
 
+bool hasField(const string& text, const string& key)
+{
+    return text.find("\"" + key + "\"") != string::npos;
+}
+
 // parseIntArray（解析整数数组）输入形式 const string& arrayText 输入含义 数组文本 输出形式 vector<int> 输出含义 数组中提取出的全部整数
 vector<int> parseIntArray(const string& arrayText)
 {
@@ -225,6 +230,26 @@ void fillPositions(MapData& mapData)
         }
     }
 }
+
+vector<vector<char>> parseGridAsMaze(const string& arrayText)
+{
+    vector<vector<char>> maze = parseMaze(arrayText);
+    for (vector<char>& row : maze)
+    {
+        for (char& cell : row)
+        {
+            if (cell == 'P')
+            {
+                cell = 'S';
+            }
+            else if (cell == '.')
+            {
+                cell = ' ';
+            }
+        }
+    }
+    return maze;
+}
 }
 
 // load（读取JSON输入）输入形式 const string& filePath 输入含义 JSON文件路径 输出形式 LoadedGameData 输出含义 初始化GameEngine所需的地图、配置、玩家和Boss数据
@@ -233,6 +258,17 @@ LoadedGameData JsonLoader::load(const string& filePath)
     string text = readFile(filePath);
 
     LoadedGameData data;
+    if (hasField(text, "grid") && !hasField(text, "maze"))
+    {
+        data.mapData.maze = parseGridAsMaze(extractArray(text, "grid"));
+        fillPositions(data.mapData);
+        data.config.finishOnNoAction = true;
+        data.player.position = data.mapData.start;
+        data.player.coins = 0;
+        data.player.steps = 0;
+        return data;
+    }
+
     data.mapData.maze = parseMaze(extractArray(text, "maze"));
     fillPositions(data.mapData);
 
@@ -248,7 +284,7 @@ LoadedGameData JsonLoader::load(const string& filePath)
         data.player.skills.push_back(skill);
     }
 
-    data.config.minRounds = extractInt(text, "minRouds");
+    data.config.minRounds = extractInt(text, "minRounds");
     data.config.coinConsumption = extractInt(text, "CoinConsumption");
     data.player.position = data.mapData.start;
     data.player.coins = 0;

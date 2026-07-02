@@ -7,6 +7,9 @@
     body { margin: 0; font-family: Arial, sans-serif; background: #f6f7fb; color: #1f2937; }
     .page { max-width: 1180px; margin: 28px auto; padding: 0 24px; }
     h1 { margin: 0 0 18px; font-size: 28px; }
+    .runner { display: grid; grid-template-columns: minmax(160px, 1fr) 150px 110px minmax(160px, 1.4fr); gap: 10px; align-items: center; margin: 0 0 18px; }
+    select { height: 36px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; padding: 0 10px; font-weight: 700; }
+    .run-status { color: #475569; font-size: 14px; min-height: 20px; }
     .layout { display: flex; align-items: flex-start; gap: 24px; }
     .maze { display: grid; gap: 3px; width: max-content; padding: 16px; background: #ffffff; border: 1px solid #d7dce5; }
     .cell { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; box-sizing: border-box; }
@@ -39,6 +42,18 @@
 <body>
   <main class="page">
     <h1>Maze Visualization</h1>
+    <div class="runner">
+      <select id="mapSelect"></select>
+      <select id="algorithmSelect">
+        <option value="greedy">greedy</option>
+        <option value="divide">divide</option>
+        <option value="astar">astar</option>
+        <option value="dijkstra">dijkstra</option>
+        <option value="bfs">bfs</option>
+      </select>
+      <button id="runBtn">Run</button>
+      <span id="runStatus" class="run-status"></span>
+    </div>
     <div class="layout">
       <section>
         <div id="maze" class="maze"></div>
@@ -69,155 +84,35 @@
         <div class="line"><strong>Action:</strong> <span id="actionValue">START</span></div>
         <div class="line"><strong>Events:</strong></div>
         <div id="eventsValue" class="events">START</div>
-        <div class="line"><strong>Final:</strong> coins 240, steps 108, ratio 2.22222</div>
+        <div class="line"><strong>Final:</strong> coins 150, steps 4, ratio 37.5</div>
       </aside>
     </div>
   </main>
   <script>
-    const columnCount = 15;
+    const columnCount = 3;
     const maze = [
-      ["#","#","#","#","#","#","#","#","#","#","#","S","#","#","#"],
-      ["#"," ","G","T","G","#"," "," "," "," "," "," "," "," ","#"],
-      ["#","#","#","G","#","#","#"," ","#","#","#","#","#","#","#"],
-      ["#"," ","T"," "," "," ","#"," "," "," ","#"," ","#","G","#"],
-      ["#","#","#"," ","#"," ","#","#","#"," ","#"," ","#","G","#"],
-      ["#"," ","G"," ","#"," ","#","G"," "," "," "," ","G","T","#"],
-      ["#","#","#"," ","#"," ","#","#","#","#","#","T","#","T","#"],
-      ["#"," ","#"," ","#"," ","#"," "," "," "," "," ","#"," ","#"],
-      ["#","T","#"," ","#"," ","#","#","#"," ","#","#","#"," ","#"],
-      ["#"," "," "," ","#"," "," "," "," "," "," "," ","#"," ","#"],
-      ["#"," ","#","#","#","#","#","#","#","#","#","#","#","#","#"],
-      ["#"," "," "," ","#","G","#"," ","T"," ","#","G","T"," ","#"],
-      ["#","#","#"," ","#","T","#"," ","#","#","#","#","#"," ","#"],
-      ["#"," "," "," "," "," "," "," ","B"," "," "," ","T","G","#"],
-      ["#","#","#","#","#","#","#","#","#","E","#","#","#","#","#"]
+      ["S","G","T"],
+      [" ","G"," "],
+      ["T"," ","G"]
     ];
     const steps = [
-      {step:0, position:[0,11], coins:0, action:"START", events:["START"]},
-      {step:1, position:[1,11], coins:0, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:2, position:[1,10], coins:0, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:3, position:[1,9], coins:0, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:4, position:[1,8], coins:0, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:5, position:[1,7], coins:0, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:6, position:[1,6], coins:0, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:7, position:[1,7], coins:0, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:8, position:[2,7], coins:0, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:9, position:[3,7], coins:0, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:10, position:[3,8], coins:0, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:11, position:[3,9], coins:0, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:12, position:[4,9], coins:0, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:13, position:[5,9], coins:0, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:14, position:[5,8], coins:0, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:15, position:[5,7], coins:50, action:"MOVE(LEFT)", events:["MOVE_SUCCESS","PICK_GOLD"]},
-      {step:16, position:[5,8], coins:50, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:17, position:[5,9], coins:50, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:18, position:[5,10], coins:50, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:19, position:[5,11], coins:50, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:20, position:[5,12], coins:100, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS","PICK_GOLD"]},
-      {step:21, position:[5,13], coins:70, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS","TRIGGER_TRAP"]},
-      {step:22, position:[4,13], coins:120, action:"MOVE(UP)", events:["MOVE_SUCCESS","PICK_GOLD"]},
-      {step:23, position:[3,13], coins:170, action:"MOVE(UP)", events:["MOVE_SUCCESS","PICK_GOLD"]},
-      {step:24, position:[4,13], coins:170, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:25, position:[5,13], coins:170, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:26, position:[6,13], coins:140, action:"MOVE(DOWN)", events:["MOVE_SUCCESS","TRIGGER_TRAP"]},
-      {step:27, position:[7,13], coins:140, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:28, position:[8,13], coins:140, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:29, position:[9,13], coins:140, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:30, position:[8,13], coins:140, action:"MOVE(UP)", events:["MOVE_SUCCESS"]},
-      {step:31, position:[7,13], coins:140, action:"MOVE(UP)", events:["MOVE_SUCCESS"]},
-      {step:32, position:[6,13], coins:140, action:"MOVE(UP)", events:["MOVE_SUCCESS"]},
-      {step:33, position:[5,13], coins:140, action:"MOVE(UP)", events:["MOVE_SUCCESS"]},
-      {step:34, position:[5,12], coins:140, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:35, position:[5,11], coins:140, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:36, position:[4,11], coins:140, action:"MOVE(UP)", events:["MOVE_SUCCESS"]},
-      {step:37, position:[5,11], coins:140, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:38, position:[6,11], coins:110, action:"MOVE(DOWN)", events:["MOVE_SUCCESS","TRIGGER_TRAP"]},
-      {step:39, position:[7,11], coins:110, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:40, position:[7,10], coins:110, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:41, position:[7,9], coins:110, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:42, position:[7,8], coins:110, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:43, position:[7,7], coins:110, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:44, position:[7,8], coins:110, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:45, position:[7,9], coins:110, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:46, position:[8,9], coins:110, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:47, position:[9,9], coins:110, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:48, position:[9,8], coins:110, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:49, position:[9,7], coins:110, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:50, position:[9,6], coins:110, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:51, position:[9,5], coins:110, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:52, position:[8,5], coins:110, action:"MOVE(UP)", events:["MOVE_SUCCESS"]},
-      {step:53, position:[7,5], coins:110, action:"MOVE(UP)", events:["MOVE_SUCCESS"]},
-      {step:54, position:[6,5], coins:110, action:"MOVE(UP)", events:["MOVE_SUCCESS"]},
-      {step:55, position:[5,5], coins:110, action:"MOVE(UP)", events:["MOVE_SUCCESS"]},
-      {step:56, position:[4,5], coins:110, action:"MOVE(UP)", events:["MOVE_SUCCESS"]},
-      {step:57, position:[3,5], coins:110, action:"MOVE(UP)", events:["MOVE_SUCCESS"]},
-      {step:58, position:[3,4], coins:110, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:59, position:[3,3], coins:110, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:60, position:[2,3], coins:160, action:"MOVE(UP)", events:["MOVE_SUCCESS","PICK_GOLD"]},
-      {step:61, position:[1,3], coins:130, action:"MOVE(UP)", events:["MOVE_SUCCESS","TRIGGER_TRAP"]},
-      {step:62, position:[1,4], coins:180, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS","PICK_GOLD"]},
-      {step:63, position:[1,3], coins:180, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:64, position:[1,2], coins:230, action:"MOVE(LEFT)", events:["MOVE_SUCCESS","PICK_GOLD"]},
-      {step:65, position:[1,1], coins:230, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:66, position:[1,2], coins:230, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:67, position:[1,3], coins:230, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:68, position:[2,3], coins:230, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:69, position:[3,3], coins:230, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:70, position:[3,2], coins:200, action:"MOVE(LEFT)", events:["MOVE_SUCCESS","TRIGGER_TRAP"]},
-      {step:71, position:[3,1], coins:200, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:72, position:[3,2], coins:200, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:73, position:[3,3], coins:200, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:74, position:[4,3], coins:200, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:75, position:[5,3], coins:200, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:76, position:[5,2], coins:250, action:"MOVE(LEFT)", events:["MOVE_SUCCESS","PICK_GOLD"]},
-      {step:77, position:[5,1], coins:250, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:78, position:[5,2], coins:250, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:79, position:[5,3], coins:250, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:80, position:[6,3], coins:250, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:81, position:[7,3], coins:250, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:82, position:[8,3], coins:250, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:83, position:[9,3], coins:250, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:84, position:[9,2], coins:250, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:85, position:[9,1], coins:250, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:86, position:[8,1], coins:220, action:"MOVE(UP)", events:["MOVE_SUCCESS","TRIGGER_TRAP"]},
-      {step:87, position:[9,1], coins:220, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:88, position:[10,1], coins:220, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:89, position:[11,1], coins:220, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:90, position:[11,2], coins:220, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:91, position:[11,3], coins:220, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:92, position:[12,3], coins:220, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:93, position:[13,3], coins:220, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:94, position:[13,2], coins:220, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:95, position:[13,1], coins:220, action:"MOVE(LEFT)", events:["MOVE_SUCCESS"]},
-      {step:96, position:[13,2], coins:220, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:97, position:[13,3], coins:220, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:98, position:[13,4], coins:220, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:99, position:[13,5], coins:220, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:100, position:[12,5], coins:190, action:"MOVE(UP)", events:["MOVE_SUCCESS","TRIGGER_TRAP"]},
-      {step:101, position:[11,5], coins:240, action:"MOVE(UP)", events:["MOVE_SUCCESS","PICK_GOLD"]},
-      {step:102, position:[12,5], coins:240, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:103, position:[13,5], coins:240, action:"MOVE(DOWN)", events:["MOVE_SUCCESS"]},
-      {step:104, position:[13,6], coins:240, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:105, position:[13,7], coins:240, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:106, position:[13,8], coins:240, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS","ENTER_BOSS"]},
-      {step:107, position:[13,8], coins:240, action:"USE_SKILL(0)", events:["USE_SKILL_SUCCESS","BOSS_DAMAGED"]},
-      {step:108, position:[13,8], coins:240, action:"USE_SKILL(3)", events:["USE_SKILL_SUCCESS","BOSS_DAMAGED","BOSS_DEFEATED"]},
-      {step:109, position:[13,8], coins:240, action:"USE_SKILL(2)", events:["USE_SKILL_SUCCESS","BOSS_DAMAGED"]},
-      {step:110, position:[13,8], coins:240, action:"USE_SKILL(1)", events:["USE_SKILL_SUCCESS","BOSS_DAMAGED"]},
-      {step:111, position:[13,8], coins:240, action:"USE_SKILL(0)", events:["USE_SKILL_SUCCESS","BOSS_DAMAGED","BOSS_DEFEATED"]},
-      {step:112, position:[13,8], coins:240, action:"USE_SKILL(3)", events:["USE_SKILL_SUCCESS","BOSS_DAMAGED"]},
-      {step:113, position:[13,8], coins:240, action:"USE_SKILL(2)", events:["USE_SKILL_SUCCESS","BOSS_DAMAGED","BOSS_DEFEATED"]},
-      {step:114, position:[13,8], coins:240, action:"USE_SKILL(1)", events:["USE_SKILL_SUCCESS","BOSS_DAMAGED"]},
-      {step:115, position:[13,8], coins:240, action:"USE_SKILL(0)", events:["USE_SKILL_SUCCESS","BOSS_DAMAGED"]},
-      {step:116, position:[13,8], coins:240, action:"USE_SKILL(3)", events:["USE_SKILL_SUCCESS","BOSS_DAMAGED","BOSS_DEFEATED"]},
-      {step:117, position:[13,9], coins:240, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
-      {step:118, position:[14,9], coins:240, action:"MOVE(DOWN)", events:["MOVE_SUCCESS","REACH_END","GAME_WIN"]}
+      {step:0, position:[0,0], coins:0, action:"START", events:["START"]},
+      {step:1, position:[0,1], coins:50, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS","PICK_GOLD"]},
+      {step:2, position:[1,1], coins:100, action:"MOVE(DOWN)", events:["MOVE_SUCCESS","PICK_GOLD"]},
+      {step:3, position:[1,2], coins:100, action:"MOVE(RIGHT)", events:["MOVE_SUCCESS"]},
+      {step:4, position:[2,2], coins:150, action:"MOVE(DOWN)", events:["MOVE_SUCCESS","PICK_GOLD"]},
+      {step:5, position:[2,2], coins:150, action:"NONE", events:["GAME_WIN"]}
     ];
     let currentIndex = 0;
     let timer = null;
     const mazeEl = document.getElementById('maze');
     const rangeEl = document.getElementById('stepRange');
     const playBtn = document.getElementById('playBtn');
+    const mapSelect = document.getElementById('mapSelect');
+    const algorithmSelect = document.getElementById('algorithmSelect');
+    const runBtn = document.getElementById('runBtn');
+    const runStatus = document.getElementById('runStatus');
+    const selectionStorageKey = 'maze-visualizer-selection';
     function classForCell(cell) {
       if (cell === '#') return 'wall';
       if (cell === 'S') return 'start';
@@ -262,8 +157,61 @@
       currentIndex = Math.max(0, Math.min(index, steps.length - 1));
       render();
     }
+    function savedSelection() {
+      try { return JSON.parse(localStorage.getItem(selectionStorageKey)) || {}; }
+      catch (_) { return {}; }
+    }
+    function saveSelection() {
+      localStorage.setItem(selectionStorageKey, JSON.stringify({
+        map: mapSelect.value,
+        algorithm: algorithmSelect.value
+      }));
+    }
+    function restoreAlgorithm() {
+      const saved = savedSelection();
+      if (saved.algorithm) algorithmSelect.value = saved.algorithm;
+    }
+    async function loadMaps() {
+      try {
+        const response = await fetch('/api/maps');
+        if (!response.ok) return;
+        const data = await response.json();
+        const saved = savedSelection();
+        mapSelect.innerHTML = '';
+        for (const map of data.maps) {
+          const option = document.createElement('option');
+          option.value = map;
+          option.textContent = map;
+          mapSelect.appendChild(option);
+        }
+        if (saved.map && data.maps.includes(saved.map)) mapSelect.value = saved.map;
+      } catch (_) {}
+    }
+    async function runSelected() {
+      stopPlayback();
+      saveSelection();
+      runBtn.disabled = true;
+      runStatus.textContent = 'Running...';
+      try {
+        const response = await fetch('/api/run', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({map: mapSelect.value, algorithm: algorithmSelect.value})
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || 'Run failed');
+        runStatus.textContent = 'Done';
+        window.location.reload();
+      } catch (error) {
+        runStatus.textContent = error.message;
+        runBtn.disabled = false;
+      }
+    }
     document.getElementById('prevBtn').addEventListener('click', () => { stopPlayback(); goTo(currentIndex - 1); });
     document.getElementById('nextBtn').addEventListener('click', () => { stopPlayback(); goTo(currentIndex + 1); });
+    mapSelect.addEventListener('change', saveSelection);
+    algorithmSelect.addEventListener('change', saveSelection);
+    runBtn.addEventListener('click', runSelected);
     playBtn.addEventListener('click', () => {
       if (timer !== null) { stopPlayback(); return; }
       playBtn.textContent = 'Pause';
@@ -274,6 +222,8 @@
     });
     rangeEl.max = steps.length - 1;
     rangeEl.addEventListener('input', () => { stopPlayback(); goTo(Number(rangeEl.value)); });
+    restoreAlgorithm();
+    loadMaps();
     render();
   </script>
 </body>
