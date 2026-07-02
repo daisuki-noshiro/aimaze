@@ -98,7 +98,7 @@ int calcScore(char cell,
     }
     else if (cell == 'T')
     {
-        score -= 300;
+        score -= 100;
     }
     else if (cell == 'B')
     {
